@@ -1,6 +1,9 @@
 import type { FeedUnitClass } from '../facebook/DetectionTypes';
 import type { StructuralFeatureVector } from '../facebook/NodeFingerprint';
 import type { FacebookPageContext } from '../facebook/SpaNavigationObserver';
+import type { MemoryReport } from '../performance/MemoryProbe';
+import type { PrePaintReport } from '../performance/PaintProbe';
+import type { TimingReport } from '../performance/TimingProbe';
 
 export type RecyclingStatus = 'OBSERVED' | 'NOT_OBSERVED' | 'UNVERIFIED';
 export type HumanDecision = 'THIS_IS_A_POST' | 'NOT_A_POST' | 'NESTED';
@@ -29,6 +32,12 @@ export interface GroundTruthReport {
   readonly metrics: GroundTruthMetrics;
 }
 
+export interface DiagnosticSupplement {
+  readonly performance?: TimingReport;
+  readonly prePaint?: PrePaintReport;
+  readonly memory?: MemoryReport;
+}
+
 export interface M0DiagnosticReport {
   readonly probeVersion: string;
   readonly pageContext: FacebookPageContext;
@@ -48,4 +57,7 @@ export interface M0DiagnosticReport {
   readonly p99DetectionMs: number | null;
   readonly recyclingStatus: RecyclingStatus;
   readonly groundTruth?: GroundTruthReport;
+  readonly performance?: TimingReport;
+  readonly prePaint?: PrePaintReport;
+  readonly memory?: MemoryReport;
 }

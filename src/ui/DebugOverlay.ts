@@ -1,9 +1,12 @@
 import type { PipelineObservation } from '../content/observer';
 import type { GroundTruthTarget, HumanDecision } from '../diagnostics/DiagnosticSchema';
+import type { PrePaintStrategy } from '../performance/PrePaintExperiment';
 
 export interface DebugOverlayOptions {
   readonly onExport: () => void;
   readonly onLabel?: (target: GroundTruthTarget, decision: HumanDecision) => void;
+  readonly onPrePaintStrategyChange?: (strategy: PrePaintStrategy) => void;
+  readonly onLongSessionComplete?: () => void;
 }
 
 export class DebugOverlay {
@@ -22,12 +25,13 @@ export class DebugOverlay {
     style.textContent = `
       :host { all: initial; }
       .panel, .launcher { position: fixed; z-index: 2147483647; font: 12px/1.4 system-ui, sans-serif; color: #f5f5f5; }
-      .panel { top: 12px; right: 12px; width: 360px; max-height: 58vh; overflow: auto; background: rgba(18,18,20,.96); border: 1px solid #555; border-radius: 10px; padding: 10px; box-shadow: 0 8px 30px rgba(0,0,0,.35); }
+      .panel { top: 12px; right: 12px; width: 380px; max-height: 62vh; overflow: auto; background: rgba(18,18,20,.96); border: 1px solid #555; border-radius: 10px; padding: 10px; box-shadow: 0 8px 30px rgba(0,0,0,.35); }
       .launcher { top: 12px; right: 12px; border: 1px solid #777; border-radius: 999px; background: #202124; color: #fff; padding: 6px 10px; cursor: pointer; }
-      .header, .label-actions { display: flex; align-items: center; gap: 6px; }
+      .header, .label-actions, .experiment-actions { display: flex; align-items: center; gap: 6px; }
       .header { justify-content: space-between; margin-bottom: 8px; }
       .title { font-weight: 700; }
       .actions { display: flex; gap: 6px; }
+      .experiment-actions { flex-wrap: wrap; padding: 6px 0 8px; border-bottom: 1px solid #444; }
       button { font: inherit; color: #fff; background: #303134; border: 1px solid #666; border-radius: 6px; padding: 4px 7px; cursor: pointer; }
       .label-actions { margin-top: 6px; flex-wrap: wrap; }
       .item { margin: 6px 0; border-left: 4px solid #777; background: #242528; border-radius: 5px; padding: 6px 8px; overflow-wrap: anywhere; }
@@ -63,8 +67,26 @@ export class DebugOverlay {
     actions.append(exportButton, disableButton);
     header.append(title, actions);
 
+    const experimentActions = document.createElement('div');
+    experimentActions.className = 'experiment-actions';
+    this.addStrategyButton(experimentActions, 'A · no guard', 'NO_GUARD');
+    this.addStrategyButton(experimentActions, 'B · scoped guard', 'SCOPED_GUARD');
+    this.addStrategyButton(experimentActions, 'C · placeholder', 'TEMPORARY_PLACEHOLDER');
+
+    if (this.options.onLongSessionComplete !== undefined) {
+      const longSessionButton = document.createElement('button');
+      longSessionButton.type = 'button';
+      longSessionButton.textContent = 'Long session done';
+      longSessionButton.addEventListener('click', () => {
+        this.options.onLongSessionComplete?.();
+        longSessionButton.disabled = true;
+        longSessionButton.textContent = 'Long session marked';
+      });
+      experimentActions.append(longSessionButton);
+    }
+
     this.list = document.createElement('div');
-    this.panel.append(header, this.list);
+    this.panel.append(header, experimentActions, this.list);
 
     this.launcher = document.createElement('button');
     this.launcher.type = 'button';
@@ -120,16 +142,20 @@ export class DebugOverlay {
     }
 
     this.list.prepend(item);
+    while (this.list.childElementCount > 20) this.list.lastElementChild?.remove();
+  }
 
-    while (this.list.childElementCount > 20) {
-      this.list.lastElementChild?.remove();
-    }
+  private addStrategyButton(container: HTMLElement, label: string, strategy: PrePaintStrategy): void {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = label;
+    button.addEventListener('click', () => this.options.onPrePaintStrategyChange?.(strategy));
+    container.append(button);
   }
 
   private createLabelActions(target: GroundTruthTarget): HTMLDivElement {
     const container = document.createElement('div');
     container.className = 'label-actions';
-
     const decisions: Array<[string, HumanDecision]> = [
       ['THIS IS A POST', 'THIS_IS_A_POST'],
       ['NOT A POST', 'NOT_A_POST'],
@@ -140,14 +166,10 @@ export class DebugOverlay {
       const button = document.createElement('button');
       button.type = 'button';
       button.textContent = label;
-      button.addEventListener(
-        'click',
-        () => {
-          this.options.onLabel?.(target, decision);
-          container.replaceChildren(document.createTextNode(`Labeled: ${label}`));
-        },
-        { once: true }
-      );
+      button.addEventListener('click', () => {
+        this.options.onLabel?.(target, decision);
+        container.replaceChildren(document.createTextNode(`Labeled: ${label}`));
+      }, { once: true });
       container.append(button);
     }
 

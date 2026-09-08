@@ -1,7 +1,12 @@
 import type { PipelineObservation } from '../content/observer';
 import type { NodeLifecycleEvent } from '../facebook/RecyclingProbe';
 import type { FacebookPageContext } from '../facebook/SpaNavigationObserver';
-import type { GroundTruthReport, M0DiagnosticReport, RecyclingStatus } from './DiagnosticSchema';
+import type {
+  DiagnosticSupplement,
+  GroundTruthReport,
+  M0DiagnosticReport,
+  RecyclingStatus
+} from './DiagnosticSchema';
 
 const MAX_TIMING_SAMPLES = 10_000;
 
@@ -40,9 +45,7 @@ export class DiagnosticCollector {
         break;
     }
 
-    if (this.timingSamples.length < MAX_TIMING_SAMPLES) {
-      this.timingSamples.push(observation.batchLatencyMs);
-    }
+    if (this.timingSamples.length < MAX_TIMING_SAMPLES) this.timingSamples.push(observation.batchLatencyMs);
   }
 
   recordLifecycle(event: NodeLifecycleEvent): void {
@@ -69,7 +72,7 @@ export class DiagnosticCollector {
     this.longSessionCompleted = true;
   }
 
-  report(groundTruth?: GroundTruthReport): M0DiagnosticReport {
+  report(groundTruth?: GroundTruthReport, supplement: DiagnosticSupplement = {}): M0DiagnosticReport {
     const recyclingStatus: RecyclingStatus =
       this.nodeReuseDetected > 0 ? 'OBSERVED' : this.longSessionCompleted ? 'NOT_OBSERVED' : 'UNVERIFIED';
 
@@ -91,13 +94,13 @@ export class DiagnosticCollector {
       p95DetectionMs: this.quantile(0.95),
       p99DetectionMs: this.quantile(0.99),
       recyclingStatus,
-      ...(groundTruth === undefined ? {} : { groundTruth })
+      ...(groundTruth === undefined ? {} : { groundTruth }),
+      ...supplement
     };
   }
 
   private quantile(percentile: number): number | null {
     if (this.timingSamples.length === 0) return null;
-
     const sorted = [...this.timingSamples].sort((left, right) => left - right);
     const index = Math.min(sorted.length - 1, Math.ceil(percentile * sorted.length) - 1);
     return sorted[Math.max(0, index)] ?? null;

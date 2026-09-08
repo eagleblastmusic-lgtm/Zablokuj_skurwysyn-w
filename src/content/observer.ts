@@ -1,7 +1,9 @@
-import type { FeedUnitDetection } from '../facebook/DetectionTypes';
 import { FacebookDOMAdapter } from '../facebook/FacebookDOMAdapter';
 import { NodeFingerprint, type NodeFingerprintResult } from '../facebook/NodeFingerprint';
 import { RecyclingProbe, type NodeLifecycleEvent } from '../facebook/RecyclingProbe';
+import type { FeedUnitDetection } from '../facebook/DetectionTypes';
+import { PrePaintExperiment } from '../performance/PrePaintExperiment';
+import { TimingProbe } from '../performance/TimingProbe';
 
 const STRUCTURAL_ANCHOR_SELECTOR = '[aria-posinset], [role="article"]';
 
@@ -17,6 +19,8 @@ export interface MutationPipelineOptions {
   readonly onLifecycleEvent?: (event: NodeLifecycleEvent) => void;
   readonly scheduleFrame?: (callback: FrameRequestCallback) => number;
   readonly now?: () => number;
+  readonly timingProbe?: TimingProbe;
+  readonly prePaintExperiment?: PrePaintExperiment;
 }
 
 export class MutationPipeline {
@@ -44,9 +48,7 @@ export class MutationPipeline {
       attributeFilter: ['role', 'aria-posinset', 'href']
     });
 
-    if (document.documentElement !== null) {
-      this.queueRoot(document.documentElement);
-    }
+    if (document.documentElement !== null) this.queueRoot(document.documentElement);
   }
 
   stop(): void {
@@ -55,20 +57,27 @@ export class MutationPipeline {
     this.pendingRoots.clear();
     this.frameScheduled = false;
     this.batchQueuedAt = null;
+    this.options.prePaintExperiment?.releaseAll();
   }
 
   private handleMutations(records: readonly MutationRecord[]): void {
+    const callbackStarted = this.now();
+
     for (const record of records) {
       if (record.type === 'childList') {
         for (const removed of record.removedNodes) {
           if (removed instanceof HTMLElement) {
+            this.options.prePaintExperiment?.releaseRemovedSubtree(removed);
             this.markRemovedTree(removed);
           }
         }
 
         for (const added of record.addedNodes) {
           if (added instanceof HTMLElement) {
-            this.queueRoot(added);
+            if (!added.hasAttribute('data-m0-prepaint-placeholder')) {
+              this.options.prePaintExperiment?.prepareAddedSubtree(added);
+              this.queueRoot(added);
+            }
           } else if (record.target instanceof HTMLElement) {
             this.queueRoot(record.target);
           }
@@ -80,6 +89,8 @@ export class MutationPipeline {
         this.queueRoot(record.target);
       }
     }
+
+    this.options.timingProbe?.record('mutationCallbackMs', Math.max(0, this.now() - callbackStarted));
   }
 
   private queueRoot(node: HTMLElement): void {
@@ -107,29 +118,44 @@ export class MutationPipeline {
     this.pendingRoots.clear();
     this.frameScheduled = false;
     this.batchQueuedAt = null;
+    let batchSize = 0;
 
     for (const root of roots) {
-      for (const detection of this.adapter.scan(root)) {
-        const node = detection.candidate.node;
-        const fingerprint = this.fingerprinter.fingerprint(node);
-        const lifecycleEvents = this.recyclingProbe.observe(node, fingerprint, this.now());
+      const timedScan = this.adapter.scanTimed(root, () => this.now());
+      this.options.timingProbe?.record('candidateDiscoveryMs', timedScan.timing.candidateDiscoveryMs);
+      this.options.timingProbe?.record('detectorMs', timedScan.timing.detectorMs);
+      batchSize += timedScan.detections.length;
 
-        for (const event of lifecycleEvents) {
-          this.options.onLifecycleEvent?.(event);
-        }
+      for (const detection of timedScan.detections) {
+        const node = detection.candidate.node;
+        this.options.prePaintExperiment?.markDetected(node);
+
+        const fingerprintStarted = this.now();
+        const fingerprint = this.fingerprinter.fingerprint(node);
+        this.options.timingProbe?.record('fingerprintMs', Math.max(0, this.now() - fingerprintStarted));
+
+        const lifecycleEvents = this.recyclingProbe.observe(node, fingerprint, this.now());
+        for (const event of lifecycleEvents) this.options.onLifecycleEvent?.(event);
 
         const previousFingerprint = this.processedFingerprints.get(node);
-        if (previousFingerprint === fingerprint.id && lifecycleEvents.length === 0) continue;
-
+        const shouldEmit = previousFingerprint !== fingerprint.id || lifecycleEvents.length > 0;
         this.processedFingerprints.set(node, fingerprint.id);
-        this.options.onObservation?.({
-          detection,
-          fingerprint,
-          lifecycleEvents,
-          batchLatencyMs: Math.max(0, this.now() - startedAt)
-        });
+
+        if (shouldEmit) {
+          this.options.onObservation?.({
+            detection,
+            fingerprint,
+            lifecycleEvents,
+            batchLatencyMs: Math.max(0, this.now() - startedAt)
+          });
+        }
+
+        this.options.prePaintExperiment?.decisionReady(node);
       }
     }
+
+    this.options.timingProbe?.record('batchSize', batchSize);
+    this.options.timingProbe?.record('endToEndMs', Math.max(0, this.now() - startedAt));
   }
 
   private markRemovedTree(root: HTMLElement): void {
