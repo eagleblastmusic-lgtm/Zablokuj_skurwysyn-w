@@ -1,0 +1,35 @@
+{
+  "name": "zablokuj-skurwysyn-w",
+  "version": "0.0.1",
+  "private": true,
+  "description": "M0 Technical Probe for privacy-safe Facebook feed-unit detection in a Chrome MV3 extension.",
+  "type": "module",
+  "scripts": {
+    "build": "npm run clean && tsc --noEmit && vite build",
+    "clean": "node ./scripts/clean.mjs",
+    "dev": "vite build --watch",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "e2e": "playwright test",
+    "validate": "npm run lint && npm run typecheck && npm run test && npm run build"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "@types/node": "^24.3.0",
+    "@eslint/js": "^9.34.0",
+    "eslint": "^9.34.0",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.43.0",
+    "vite": "^7.1.3",
+    "vitest": "^3.2.4"
+  }
+}
