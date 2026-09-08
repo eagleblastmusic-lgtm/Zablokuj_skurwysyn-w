@@ -31,6 +31,10 @@ export class SpaNavigationObserver {
     private readonly options: SpaNavigationOptions = {}
   ) {}
 
+  currentContext(): FacebookPageContext {
+    return this.contextForPath(this.readRoute().pathname);
+  }
+
   start(): void {
     if (this.timerId !== null) return;
 
