@@ -18,7 +18,7 @@ export class Sanitizer {
 
     for (const node of nodes) {
       if (node.nodeType === Node.COMMENT_NODE) {
-        node.remove();
+        node.parentNode?.removeChild(node);
         replacements += 1;
         continue;
       }
