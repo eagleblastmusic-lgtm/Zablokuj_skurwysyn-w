@@ -19,7 +19,7 @@ describe('node fingerprint and recycling instrumentation', () => {
     document.body.replaceChildren();
   });
 
-  it('changes the semantic fingerprint when the same node changes content', () => {
+  it('changes the semantic fingerprint when the same node changes content without exporting a content hash', () => {
     const fingerprinter = new NodeFingerprint();
     const node = createCandidate('TEXT_A');
     const first = fingerprinter.fingerprint(node);
@@ -28,7 +28,8 @@ describe('node fingerprint and recycling instrumentation', () => {
     const second = fingerprinter.fingerprint(node);
 
     expect(first.id).not.toBe(second.id);
-    expect(first.features.textHash).not.toBe(second.features.textHash);
+    expect('textHash' in first.features).toBe(false);
+    expect('textHash' in second.features).toBe(false);
   });
 
   it('records reuse, removal, and return without retaining enumerable node collections', () => {

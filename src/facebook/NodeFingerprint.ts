@@ -8,7 +8,6 @@ export interface StructuralFeatureVector {
   readonly mediaCount: number;
   readonly nestedArticleCount: number;
   readonly textLengthBucket: number;
-  readonly textHash: string;
 }
 
 export interface NodeFingerprintResult {
@@ -19,6 +18,7 @@ export interface NodeFingerprintResult {
 export class NodeFingerprint {
   fingerprint(node: HTMLElement): NodeFingerprintResult {
     const normalizedText = (node.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 4096);
+    const contentHash = this.hash(normalizedText);
     const features: StructuralFeatureVector = {
       tagName: node.tagName,
       role: node.getAttribute('role'),
@@ -28,12 +28,11 @@ export class NodeFingerprint {
       linkCount: node.querySelectorAll('a').length,
       mediaCount: node.querySelectorAll('img, video, canvas').length,
       nestedArticleCount: node.querySelectorAll('[role="article"]').length,
-      textLengthBucket: Math.min(63, Math.floor(normalizedText.length / 64)),
-      textHash: this.hash(normalizedText)
+      textLengthBucket: Math.min(63, Math.floor(normalizedText.length / 64))
     };
 
     return {
-      id: this.hash(JSON.stringify(features)),
+      id: this.hash(JSON.stringify({ ...features, contentHash })),
       features
     };
   }
