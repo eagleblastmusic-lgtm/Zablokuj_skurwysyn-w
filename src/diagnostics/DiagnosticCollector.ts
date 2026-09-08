@@ -1,7 +1,7 @@
 import type { PipelineObservation } from '../content/observer';
 import type { NodeLifecycleEvent } from '../facebook/RecyclingProbe';
 import type { FacebookPageContext } from '../facebook/SpaNavigationObserver';
-import type { M0DiagnosticReport, RecyclingStatus } from './DiagnosticSchema';
+import type { GroundTruthReport, M0DiagnosticReport, RecyclingStatus } from './DiagnosticSchema';
 
 const MAX_TIMING_SAMPLES = 10_000;
 
@@ -69,7 +69,7 @@ export class DiagnosticCollector {
     this.longSessionCompleted = true;
   }
 
-  report(): M0DiagnosticReport {
+  report(groundTruth?: GroundTruthReport): M0DiagnosticReport {
     const recyclingStatus: RecyclingStatus =
       this.nodeReuseDetected > 0 ? 'OBSERVED' : this.longSessionCompleted ? 'NOT_OBSERVED' : 'UNVERIFIED';
 
@@ -90,7 +90,8 @@ export class DiagnosticCollector {
       medianDetectionMs: this.quantile(0.5),
       p95DetectionMs: this.quantile(0.95),
       p99DetectionMs: this.quantile(0.99),
-      recyclingStatus
+      recyclingStatus,
+      ...(groundTruth === undefined ? {} : { groundTruth })
     };
   }
 

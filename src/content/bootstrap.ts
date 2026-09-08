@@ -1,15 +1,18 @@
 import { startProbe } from '../bootstrap';
 import { DiagnosticCollector } from '../diagnostics/DiagnosticCollector';
 import { DiagnosticExporter } from '../diagnostics/DiagnosticExporter';
+import { GroundTruthCollector } from '../diagnostics/GroundTruthCollector';
 import { SpaNavigationObserver } from '../facebook/SpaNavigationObserver';
 import { DebugOverlay } from '../ui/DebugOverlay';
 import { MutationPipeline } from './observer';
 
 const probeInfo = startProbe();
 const diagnostics = new DiagnosticCollector(probeInfo.version);
+const groundTruth = new GroundTruthCollector();
 const exporter = new DiagnosticExporter();
 const overlay = new DebugOverlay({
-  onExport: () => exporter.download(diagnostics.report())
+  onExport: () => exporter.download(diagnostics.report(groundTruth.report())),
+  onLabel: (target, decision) => groundTruth.record(target, decision)
 });
 overlay.mount();
 
