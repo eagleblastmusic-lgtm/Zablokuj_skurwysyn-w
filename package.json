@@ -5,7 +5,7 @@
   "description": "M0 Technical Probe for privacy-safe Facebook feed-unit detection in a Chrome MV3 extension.",
   "type": "module",
   "scripts": {
-    "build": "npm run clean && tsc --noEmit && vite build",
+    "build": "npm run clean && tsc --noEmit && vite build && node ./scripts/build-extension.mjs",
     "clean": "node ./scripts/clean.mjs",
     "dev": "vite build --watch",
     "lint": "eslint .",

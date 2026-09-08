@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "Bloker Polityki M0 Probe",
+  "version": "0.0.1",
+  "description": "Local-only technical probe for Facebook feed-unit detection.",
+  "content_scripts": [
+    {
+      "matches": ["https://www.facebook.com/*"],
+      "js": ["content/probe.js"],
+      "run_at": "document_start",
+      "world": "ISOLATED"
+    }
+  ],
+  "permissions": []
+}

@@ -11,7 +11,7 @@ export default defineConfig({
     sourcemap: false,
     rollupOptions: {
       input: {
-        probe: resolve(rootDir, 'src/bootstrap.ts')
+        probe: resolve(rootDir, 'src/content/bootstrap.ts')
       },
       output: {
         entryFileNames: 'content/[name].js',
