@@ -49,6 +49,68 @@ describe('Facebook DOM detection', () => {
     expect(firstDetection?.confidence).toBeGreaterThanOrEqual(0.55);
   });
 
+  it('accepts the live repeated role=article pattern inside main even without role=feed', () => {
+    const main = document.createElement('main');
+    main.setAttribute('role', 'main');
+    const first = document.createElement('div');
+    first.setAttribute('role', 'article');
+    const second = document.createElement('div');
+    second.setAttribute('role', 'article');
+    main.append(first, second);
+    document.body.append(main);
+
+    const detection = new FacebookDOMAdapter()
+      .scan(document)
+      .find((item) => item.candidate.node === first);
+
+    expect(detection?.candidate.signals.roleArticle).toBe(true);
+    expect(detection?.candidate.signals.insideMain).toBe(true);
+    expect(detection?.candidate.signals.insideFeed).toBe(false);
+    expect(detection?.candidate.signals.repeatedSiblingStructure).toBe(true);
+    expect(detection?.confidence).toBeCloseTo(0.42, 2);
+    expect(detection?.classification).toBe('TOP_LEVEL_FEED_UNIT');
+  });
+
+  it('accepts the live aria-position plus action pattern inside main', () => {
+    const main = document.createElement('main');
+    main.setAttribute('role', 'main');
+    const unit = document.createElement('div');
+    unit.setAttribute('aria-posinset', '1');
+    const action = document.createElement('button');
+    unit.append(action);
+    main.append(unit);
+    document.body.append(main);
+
+    const detection = new FacebookDOMAdapter()
+      .scan(document)
+      .find((item) => item.candidate.node === unit);
+
+    expect(detection?.candidate.signals.ariaPosInSet).toBe(true);
+    expect(detection?.candidate.signals.insideMain).toBe(true);
+    expect(detection?.candidate.signals.actionStructure).toBe(true);
+    expect(detection?.confidence).toBeCloseTo(0.45, 2);
+    expect(detection?.classification).toBe('TOP_LEVEL_FEED_UNIT');
+  });
+
+  it('keeps similar anchors outside main and feed as unknown', () => {
+    const wrapper = document.createElement('section');
+    const first = document.createElement('div');
+    first.setAttribute('role', 'article');
+    const second = document.createElement('div');
+    second.setAttribute('role', 'article');
+    wrapper.append(first, second);
+    document.body.append(wrapper);
+
+    const detection = new FacebookDOMAdapter()
+      .scan(document)
+      .find((item) => item.candidate.node === first);
+
+    expect(detection?.candidate.signals.repeatedSiblingStructure).toBe(true);
+    expect(detection?.candidate.signals.insideMain).toBe(false);
+    expect(detection?.candidate.signals.insideFeed).toBe(false);
+    expect(detection?.classification).toBe('UNKNOWN');
+  });
+
   it('rejects a structurally nested article as a separate top-level unit', () => {
     const main = document.createElement('main');
     main.setAttribute('role', 'main');

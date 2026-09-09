@@ -128,9 +128,9 @@ export class DebugOverlay {
 
     const meta = document.createElement('div');
     meta.className = 'meta';
-    meta.textContent = `fp ${observation.fingerprint.id} · ${observation.batchLatencyMs.toFixed(2)} ms · ${signalNames || 'no positive signals'}`;
+    meta.textContent = `fp ${observation.fingerprint.id} · batch ${observation.batchLatencyMs.toFixed(2)} ms · ${signalNames || 'no positive signals'}`;
 
-    item.append(summary, meta);
+    item.append(summary, meta, this.createLocateButton(observation.detection.candidate.node));
 
     if (this.options.onLabel !== undefined) {
       const target: GroundTruthTarget = {
@@ -151,6 +151,43 @@ export class DebugOverlay {
     button.textContent = label;
     button.addEventListener('click', () => this.options.onPrePaintStrategyChange?.(strategy));
     container.append(button);
+  }
+
+  private createLocateButton(node: HTMLElement): HTMLButtonElement {
+    const reference = new WeakRef(node);
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = 'Locate';
+    button.addEventListener('click', () => {
+      const target = reference.deref();
+      if (target === undefined || !target.isConnected) {
+        button.disabled = true;
+        button.textContent = 'Gone';
+        return;
+      }
+
+      const outline = target.style.getPropertyValue('outline');
+      const outlinePriority = target.style.getPropertyPriority('outline');
+      const outlineOffset = target.style.getPropertyValue('outline-offset');
+      const outlineOffsetPriority = target.style.getPropertyPriority('outline-offset');
+
+      target.scrollIntoView?.({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+      target.style.setProperty('outline', '4px solid #00e676', 'important');
+      target.style.setProperty('outline-offset', '3px', 'important');
+
+      window.setTimeout(() => {
+        const current = reference.deref();
+        if (current === undefined) return;
+        this.restoreStyle(current, 'outline', outline, outlinePriority);
+        this.restoreStyle(current, 'outline-offset', outlineOffset, outlineOffsetPriority);
+      }, 1_500);
+    });
+    return button;
+  }
+
+  private restoreStyle(element: HTMLElement, property: string, value: string, priority: string): void {
+    if (value === '') element.style.removeProperty(property);
+    else element.style.setProperty(property, value, priority);
   }
 
   private createLabelActions(target: GroundTruthTarget): HTMLDivElement {

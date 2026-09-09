@@ -1,6 +1,7 @@
 import type { FeedCandidate, FeedUnitDetection } from './DetectionTypes';
 
 const STRUCTURAL_ANCHOR_SELECTOR = '[aria-posinset], [role="article"]';
+const DEFAULT_TOP_LEVEL_THRESHOLD = 0.55;
 
 export class FeedUnitDetector {
   detect(candidate: FeedCandidate): FeedUnitDetection {
@@ -36,11 +37,7 @@ export class FeedUnitDetector {
       };
     }
 
-    if (
-      adjustedScore >= 0.55 &&
-      (candidate.signals.insideFeed || candidate.signals.insideMain) &&
-      (candidate.signals.ariaPosInSet || candidate.signals.roleArticle)
-    ) {
+    if (this.isTopLevelCandidate(candidate, adjustedScore)) {
       return {
         candidate,
         classification: 'TOP_LEVEL_FEED_UNIT',
@@ -59,6 +56,25 @@ export class FeedUnitDetector {
       penaltyScore,
       penalties
     };
+  }
+
+  private isTopLevelCandidate(candidate: FeedCandidate, adjustedScore: number): boolean {
+    const signals = candidate.signals;
+    const hasStructuralAnchor = signals.ariaPosInSet || signals.roleArticle;
+    const insidePrimarySurface = signals.insideFeed || signals.insideMain;
+
+    if (!hasStructuralAnchor || !insidePrimarySurface) return false;
+    if (adjustedScore >= DEFAULT_TOP_LEVEL_THRESHOLD) return true;
+
+    // Live Facebook M0 observations (2026-09-09) show two recurring top-level
+    // structures where role="feed" is absent and the aggregate score is 0.42-0.45.
+    // Keep these as explicit conjunctions rather than globally lowering the threshold.
+    const repeatedArticleInMain =
+      signals.insideMain && signals.roleArticle && signals.repeatedSiblingStructure;
+    const positionedActionUnitInMain =
+      signals.insideMain && signals.ariaPosInSet && signals.actionStructure;
+
+    return repeatedArticleInMain || positionedActionUnitInMain;
   }
 
   private hasStructuralCandidateAncestor(node: HTMLElement): boolean {
